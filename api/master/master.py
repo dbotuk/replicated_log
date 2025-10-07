@@ -121,7 +121,6 @@ class MasterServer:
 
 
 if __name__ == "__main__":
-    # sys.argv[0] is the script path; actual args start from index 1
     host = sys.argv[1] if len(sys.argv) > 1 else "0.0.0.0"
     port = int(sys.argv[2]) if len(sys.argv) > 2 else 8051
     # Remaining args are secondary URLs

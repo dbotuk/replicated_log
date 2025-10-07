@@ -2,11 +2,9 @@ from python:3.11-slim
 
 WORKDIR /app
 
-# Copy requirements first for layer caching
 COPY requirements.txt ./requirements.txt
 RUN pip install -r requirements.txt
 
-# Copy shared base module and follower service code
 COPY api/base.py ./base.py
 COPY api/follower/ ./
 
