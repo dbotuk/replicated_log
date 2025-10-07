@@ -1,0 +1,25 @@
+services:
+  master:
+    build:
+      context: .
+      dockerfile: api/master/Dockerfile
+    ports:
+      - "${MASTER_PORT}:8051"
+    command: "http://follower-1:8051 http://follower-2:8051"
+    depends_on:
+      - follower-1
+      - follower-2
+  follower-1:
+    build:
+      context: .
+      dockerfile: api/follower/Dockerfile
+    ports:
+      - "${FOLLOWER_1_PORT}:8051"
+    command: "follower-1"
+  follower-2:
+    build:
+      context: .
+      dockerfile: api/follower/Dockerfile
+    ports:
+      - "${FOLLOWER_2_PORT}:8051"
+    command: "follower-2"
