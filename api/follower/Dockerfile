@@ -11,4 +11,4 @@ COPY api/follower/ ./
 EXPOSE 8051
 
 ENTRYPOINT ["python", "follower.py", "0.0.0.0", "8051"]
-CMD ["follower"]
+CMD ["follower", "5.0"]

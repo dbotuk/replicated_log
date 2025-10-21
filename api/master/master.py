@@ -8,10 +8,9 @@ from fastapi import FastAPI
 import requests
 import uvicorn
 
-from base import BaseRequest, BaseResponse, Message
+from base import BaseRequest, BaseResponse, Message, MessageLog
 
 
-# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -24,7 +23,7 @@ class MasterServer:
         self.host = host
         self.port = port
         self.secondaries = secondaries or []
-        self.messages = []
+        self.messages = MessageLog()
         self.app = FastAPI(
             title="Master FastAPI Server",
             description="A Master FastAPI server for storing messages",
@@ -55,10 +54,10 @@ class MasterServer:
             )
 
 
-        @self.app.get("/messages", response_model=BaseResponse[List[Message]])
+        @self.app.get("/messages", response_model=BaseResponse[MessageLog])
         async def list_messages():
-            logger.info(f"Retrieved {len(self.messages)} replicated messages.")
-            return BaseResponse[List[Message]](
+            logger.info(f"Retrieved {self.messages.len()} replicated messages.")
+            return BaseResponse[MessageLog](
                 status_code=200,
                 message="Messages fetched successfully", 
                 data=self.messages
@@ -72,7 +71,7 @@ class MasterServer:
             try:
                 logger.info(f"Replicating message to secondary {index + 1}: {secondary_url}")
                 response = requests.post(
-                    f"{secondary_url}/add",
+                    f"{secondary_url}/replicate",
                     json=BaseRequest(data=message).dict(),
                     timeout=10
                 )
@@ -88,7 +87,7 @@ class MasterServer:
                 results.append(False)
         
         time_start = time.time()
-        # Start replication threads
+
         for i, secondary_url in enumerate(self.secondaries):
             thread = threading.Thread(
                 target=replicate_to_follower,
@@ -97,14 +96,12 @@ class MasterServer:
             threads.append(thread)
             thread.start()
             
-        # Wait for all threads to complete
         for thread in threads:
             thread.join()
         
         time_end = time.time()
         logger.info(f"Replication took {round(time_end - time_start, 2)} seconds")
 
-        # Check if all replications were successful
         success_count = sum(results)
         total_followers = len(self.secondaries)
             
@@ -123,7 +120,6 @@ class MasterServer:
 if __name__ == "__main__":
     host = sys.argv[1] if len(sys.argv) > 1 else "0.0.0.0"
     port = int(sys.argv[2]) if len(sys.argv) > 2 else 8051
-    # Remaining args are secondary URLs
     secondaries = sys.argv[3:] if len(sys.argv) > 3 else []
 
     master = MasterServer(
