@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import random
 import sys
@@ -38,27 +39,34 @@ class FollowerServer:
         """Setup HTTP routes for the secondary server."""
 
         @self.app.post("/replicate", response_model=BaseResponse[None])
-        async def add_message(request: BaseRequest[Message]):
-            logger.info(f"Replicating message: {request.data}")
+        async def replicate_message(request: BaseRequest[Message]):
+            message = request.data
+            logger.info(f"Replicating message: {message}")
 
             logger.info(f"Processing replication with {self.delay:.2f}s delay...")
-            time.sleep(self.delay)
+            await asyncio.sleep(self.delay)
 
-            self.messages.append(request.data)
-            logger.info(f"Message replicated successfully: {request.data}")
+            message_added = self.messages.append(message)
+
+            if not message_added:
+                logger.info(f"Message {message} was not added (duplicate)")
+            else:
+                logger.info(f"Message replicated successfully: {message}")
+
             return BaseResponse[None](
                 status_code=200,
                 message="Message replicated successfully"
             )
-
-
-        @self.app.get("/messages", response_model=BaseResponse[MessageLog])
+            
+        @self.app.get("/messages", response_model=BaseResponse[list[str]])
         async def list_messages():
-            logger.info(f"Retrieved {self.messages.len()} replicated messages.")
-            return BaseResponse[MessageLog](
+            messages = list(map(lambda x: x.text, self.messages.get_messages()))
+            logger.info(f"Retrieved {len(messages)} replicated messages: {messages}")
+            
+            return BaseResponse[list[str]](
                 status_code=200,
                 message="Messages fetched successfully", 
-                data=self.messages
+                data=messages
             )
     
     def run(self, debug=False):

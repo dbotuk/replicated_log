@@ -1,0 +1,177 @@
+(base) denisbotuk@MacBookPro Homework % docker-compose up --build
+[+] Building 1.5s (24/24) FINISHED                                                                   
+ => [internal] load local bake definitions                                                      0.0s
+ => => reading from stdin 1.62kB                                                                0.0s
+ => [follower-1 internal] load build definition from Dockerfile                                 0.0s
+ => => transferring dockerfile: 296B                                                            0.0s
+ => WARN: ConsistentInstructionCasing: Command 'from' should match the case of the command maj  0.0s
+ => WARN: ConsistentInstructionCasing: Command 'from' should match the case of the command maj  0.0s
+ => [master internal] load build definition from Dockerfile                                     0.0s
+ => => transferring dockerfile: 296B                                                            0.0s
+ => WARN: ConsistentInstructionCasing: Command 'from' should match the case of the command maj  0.0s
+ => [master internal] load metadata for docker.io/library/python:3.11-slim                      0.9s
+ => [auth] library/python:pull token for registry-1.docker.io                                   0.0s
+ => [master internal] load .dockerignore                                                        0.0s
+ => => transferring context: 2B                                                                 0.0s
+ => [follower-1 1/6] FROM docker.io/library/python:3.11-slim@sha256:8eb5fc663972b871c528fef04b  0.0s
+ => => resolve docker.io/library/python:3.11-slim@sha256:8eb5fc663972b871c528fef04be4eaa9ab8ab  0.0s
+ => [master internal] load build context                                                        0.0s
+ => => transferring context: 6.36kB                                                             0.0s
+ => [follower-2 internal] load build context                                                    0.0s
+ => => transferring context: 3.06kB                                                             0.0s
+ => CACHED [master 2/6] WORKDIR /app                                                            0.0s
+ => CACHED [follower-1 3/6] COPY requirements.txt ./requirements.txt                            0.0s
+ => CACHED [follower-1 4/6] RUN pip install -r requirements.txt                                 0.0s
+ => CACHED [master 5/6] COPY api/base.py ./base.py                                              0.0s
+ => [follower-1 6/6] COPY api/follower/ ./                                                      0.0s
+ => CACHED [master 3/6] COPY requirements.txt ./requirements.txt                                0.0s
+ => CACHED [master 4/6] RUN pip install -r requirements.txt                                     0.0s
+ => CACHED [master 5/6] COPY api/base.py ./base.py                                              0.0s
+ => [master 6/6] COPY api/master/ ./                                                            0.0s
+ => [master] exporting to image                                                                 0.2s
+ => => exporting layers                                                                         0.0s
+ => => exporting manifest sha256:7a20dbc131bbf517a2c2274bd2bff859555d152a274ebede4e6514b1b2146  0.0s
+ => => exporting config sha256:7ada2e4e109237980289eb612283ead63bd8a63c42557b06fea3e6869bdee90  0.0s
+ => => exporting attestation manifest sha256:8b801f060afde98af9fed249e9b2c1fafe3478a95d6e1ebac  0.0s
+ => => exporting manifest list sha256:1c81a30c661eeb93f3ed8608b44fb2b588a69f05dc14beadb8fb647a  0.0s
+ => => naming to docker.io/library/homework-master:latest                                       0.0s
+ => => unpacking to docker.io/library/homework-master:latest                                    0.0s
+ => [follower-2] exporting to image                                                             0.2s
+ => => exporting layers                                                                         0.0s
+ => => exporting manifest sha256:a0e58a97ea1148e30ec85f9be9f7c25159beac262688aa889b5bc4b2a403c  0.0s
+ => => exporting config sha256:cd0bda0a63096836dc2a73bbca7be2fb34a41128a2789296cca6397bba50adf  0.0s
+ => => exporting attestation manifest sha256:e45292811122d81dc42231dd26325cdca2f00689766153c76  0.0s
+ => => exporting manifest list sha256:370f8337b4997feae8ccdf7e778632e78d6f94af3d8b3a118a000e8b  0.0s
+ => => naming to docker.io/library/homework-follower-2:latest                                   0.0s
+ => => unpacking to docker.io/library/homework-follower-2:latest                                0.0s
+ => [follower-1] exporting to image                                                             0.2s
+ => => exporting layers                                                                         0.0s
+ => => exporting manifest sha256:9679efd08a6d8a7f6006c4302fd3a809452671f9d4b5bde5664e12dcffa5e  0.0s
+ => => exporting config sha256:e00f62cd44524cd6f3f1948252bc8c6d391575bb8c697f0905ce6e6555183ee  0.0s
+ => => exporting attestation manifest sha256:b80d401eaac0cc90b37a933cbed10795bd4bae0006be660f3  0.0s
+ => => exporting manifest list sha256:08ee57a70e628b20d3910d203539dad88a311bc360e007ef5015e276  0.0s
+ => => naming to docker.io/library/homework-follower-1:latest                                   0.0s
+ => => unpacking to docker.io/library/homework-follower-1:latest                                0.0s
+ => [follower-2] resolving provenance for metadata file                                         0.0s
+ => [follower-1] resolving provenance for metadata file                                         0.0s
+ => [master] resolving provenance for metadata file                                             0.0s
+[+] Running 6/6
+ ✔ homework-follower-1              Built                                                       0.0s 
+ ✔ homework-follower-2              Built                                                       0.0s 
+ ✔ homework-master                  Built                                                       0.0s 
+ ✔ Container homework-follower-2-1  Recreated                                                   0.1s 
+ ✔ Container homework-follower-1-1  Recreated                                                   0.1s 
+ ✔ Container homework-master-1      Recreated                                                   0.2s 
+Attaching to follower-1-1, follower-2-1, master-1
+follower-1-1  | 2025-10-25 21:29:54,995 - __main__ - INFO - Secondary server follower-1 initialized on 0.0.0.0:8051
+follower-1-1  | INFO:     Started server process [1]
+follower-1-1  | INFO:     Waiting for application startup.
+follower-1-1  | INFO:     Application startup complete.
+follower-1-1  | INFO:     Uvicorn running on http://0.0.0.0:8051 (Press CTRL+C to quit)
+follower-2-1  | 2025-10-25 21:29:55,016 - __main__ - INFO - Secondary server follower-2 initialized on 0.0.0.0:8051
+follower-2-1  | INFO:     Started server process [1]
+follower-2-1  | INFO:     Waiting for application startup.
+follower-2-1  | INFO:     Application startup complete.
+follower-2-1  | INFO:     Uvicorn running on http://0.0.0.0:8051 (Press CTRL+C to quit)
+master-1      | 2025-10-25 21:29:55,150 - __main__ - INFO - Master server initialized on 0.0.0.0:8051
+master-1      | 2025-10-25 21:29:55,150 - __main__ - INFO - Registered secondaries: ['http://follower-1:8051', 'http://follower-2:8051']
+master-1      | INFO:     Started server process [1]
+master-1      | INFO:     Waiting for application startup.
+master-1      | INFO:     Application startup complete.
+master-1      | INFO:     Uvicorn running on http://0.0.0.0:8051 (Press CTRL+C to quit)
+master-1      | 2025-10-25 21:29:58,338 - __main__ - INFO - Received message: text='msg1' sequence_id=1 with write_concern=1
+master-1      | 2025-10-25 21:29:58,338 - __main__ - INFO - Message added successfully: text='msg1' sequence_id=1
+master-1      | 2025-10-25 21:29:58,338 - __main__ - INFO - Replication started...
+master-1      | 2025-10-25 21:29:58,338 - __main__ - INFO - Starting replication with write_concern=1
+master-1      | 2025-10-25 21:29:58,339 - __main__ - INFO - Replicating message to secondary 1: http://follower-1:8051
+master-1      | 2025-10-25 21:29:58,340 - __main__ - INFO - Replicating message to secondary 2: http://follower-2:8051
+master-1      | 2025-10-25 21:29:58,340 - __main__ - INFO - Waiting for 0 successful replications...
+master-1      | 2025-10-25 21:29:58,340 - __main__ - INFO - Replication took 0.0 seconds
+master-1      | 2025-10-25 21:29:58,340 - __main__ - INFO - Write concern satisfied: 1/1 (including master)
+master-1      | 2025-10-25 21:29:58,341 - __main__ - INFO - Replication finished...
+master-1      | INFO:     192.168.65.1:17300 - "POST /add HTTP/1.1" 200 OK
+follower-2-1  | 2025-10-25 21:29:58,346 - __main__ - INFO - Replicating message: text='msg1' sequence_id=1
+follower-2-1  | 2025-10-25 21:29:58,346 - __main__ - INFO - Processing replication with 10.00s delay...
+follower-1-1  | 2025-10-25 21:29:58,346 - __main__ - INFO - Replicating message: text='msg1' sequence_id=1
+follower-1-1  | 2025-10-25 21:29:58,346 - __main__ - INFO - Processing replication with 0.00s delay...
+follower-1-1  | 2025-10-25 21:29:58,346 - __main__ - INFO - Message replicated successfully: text='msg1' sequence_id=1
+follower-1-1  | INFO:     172.18.0.4:54784 - "POST /replicate HTTP/1.1" 200 OK
+master-1      | 2025-10-25 21:29:58,348 - __main__ - INFO - Message successfully replicated to secondary 1.
+master-1      | 2025-10-25 21:30:00,545 - __main__ - INFO - Received message: text='msg2' sequence_id=2 with write_concern=2
+master-1      | 2025-10-25 21:30:00,546 - __main__ - INFO - Message added successfully: text='msg2' sequence_id=2
+master-1      | 2025-10-25 21:30:00,546 - __main__ - INFO - Replication started...
+master-1      | 2025-10-25 21:30:00,546 - __main__ - INFO - Starting replication with write_concern=2
+master-1      | 2025-10-25 21:30:00,546 - __main__ - INFO - Replicating message to secondary 1: http://follower-1:8051
+master-1      | 2025-10-25 21:30:00,547 - __main__ - INFO - Replicating message to secondary 2: http://follower-2:8051
+master-1      | 2025-10-25 21:30:00,548 - __main__ - INFO - Waiting for 1 successful replications...
+follower-1-1  | 2025-10-25 21:30:00,549 - __main__ - INFO - Replicating message: text='msg2' sequence_id=2
+follower-1-1  | 2025-10-25 21:30:00,549 - __main__ - INFO - Processing replication with 0.00s delay...
+follower-1-1  | 2025-10-25 21:30:00,549 - __main__ - INFO - Message replicated successfully: text='msg2' sequence_id=2
+follower-1-1  | INFO:     172.18.0.4:54790 - "POST /replicate HTTP/1.1" 200 OK
+follower-2-1  | 2025-10-25 21:30:00,549 - __main__ - INFO - Replicating message: text='msg2' sequence_id=2
+follower-2-1  | 2025-10-25 21:30:00,549 - __main__ - INFO - Processing replication with 10.00s delay...
+master-1      | 2025-10-25 21:30:00,550 - __main__ - INFO - Message successfully replicated to secondary 1.
+master-1      | 2025-10-25 21:30:00,550 - __main__ - INFO - Successful replications: 2/2
+master-1      | 2025-10-25 21:30:00,550 - __main__ - INFO - Write concern satisfied: 2/2
+master-1      | 2025-10-25 21:30:00,550 - __main__ - INFO - Replication took 0.0 seconds
+master-1      | 2025-10-25 21:30:00,550 - __main__ - INFO - Write concern satisfied: 2/2 (including master)
+master-1      | 2025-10-25 21:30:00,550 - __main__ - INFO - Replication finished...
+master-1      | INFO:     192.168.65.1:17300 - "POST /add HTTP/1.1" 200 OK
+master-1      | 2025-10-25 21:30:02,733 - __main__ - INFO - Received message: text='msg3' sequence_id=3 with write_concern=3
+master-1      | 2025-10-25 21:30:02,734 - __main__ - INFO - Message added successfully: text='msg3' sequence_id=3
+master-1      | 2025-10-25 21:30:02,734 - __main__ - INFO - Replication started...
+master-1      | 2025-10-25 21:30:02,734 - __main__ - INFO - Starting replication with write_concern=3
+master-1      | 2025-10-25 21:30:02,735 - __main__ - INFO - Replicating message to secondary 1: http://follower-1:8051
+master-1      | 2025-10-25 21:30:02,736 - __main__ - INFO - Replicating message to secondary 2: http://follower-2:8051
+master-1      | 2025-10-25 21:30:02,737 - __main__ - INFO - Waiting for 2 successful replications...
+follower-1-1  | 2025-10-25 21:30:02,738 - __main__ - INFO - Replicating message: text='msg3' sequence_id=3
+follower-1-1  | 2025-10-25 21:30:02,739 - __main__ - INFO - Processing replication with 0.00s delay...
+follower-1-1  | 2025-10-25 21:30:02,739 - __main__ - INFO - Message replicated successfully: text='msg3' sequence_id=3
+follower-1-1  | INFO:     172.18.0.4:33524 - "POST /replicate HTTP/1.1" 200 OK
+master-1      | 2025-10-25 21:30:02,739 - __main__ - INFO - Message successfully replicated to secondary 1.
+master-1      | 2025-10-25 21:30:02,739 - __main__ - INFO - Successful replications: 2/3
+follower-2-1  | 2025-10-25 21:30:02,739 - __main__ - INFO - Processing replication with 10.00s delay...
+follower-2-1  | 2025-10-25 21:30:08,351 - __main__ - INFO - Message replicated successfully: text='msg1' sequence_id=1
+follower-2-1  | INFO:     172.18.0.4:53774 - "POST /replicate HTTP/1.1" 200 OK
+master-1      | 2025-10-25 21:30:08,355 - __main__ - INFO - Message successfully replicated to secondary 2.
+follower-2-1  | 2025-10-25 21:30:10,560 - __main__ - INFO - Message replicated successfully: text='msg2' sequence_id=2
+follower-2-1  | INFO:     172.18.0.4:53786 - "POST /replicate HTTP/1.1" 200 OK
+master-1      | 2025-10-25 21:30:10,563 - __main__ - INFO - Message successfully replicated to secondary 2.
+follower-2-1  | 2025-10-25 21:30:12,743 - __main__ - INFO - Message replicated successfully: text='msg3' sequence_id=3
+follower-2-1  | INFO:     172.18.0.4:35932 - "POST /replicate HTTP/1.1" 200 OK
+master-1      | 2025-10-25 21:30:12,745 - __main__ - INFO - Message successfully replicated to secondary 2.
+master-1      | INFO:     192.168.65.1:17300 - "POST /add HTTP/1.1" 200 OK
+master-1      | 2025-10-25 21:30:12,746 - __main__ - INFO - Successful replications: 3/3
+master-1      | 2025-10-25 21:30:12,746 - __main__ - INFO - Write concern satisfied: 3/3
+master-1      | 2025-10-25 21:30:12,746 - __main__ - INFO - Replication took 10.01 seconds
+master-1      | 2025-10-25 21:30:12,746 - __main__ - INFO - Write concern satisfied: 3/3 (including master)
+master-1      | 2025-10-25 21:30:12,746 - __main__ - INFO - Replication finished...
+master-1      | 2025-10-25 21:30:15,304 - __main__ - INFO - Received message: text='msg4' sequence_id=4 with write_concern=1
+master-1      | 2025-10-25 21:30:15,304 - __main__ - INFO - Message added successfully: text='msg4' sequence_id=4
+master-1      | 2025-10-25 21:30:15,304 - __main__ - INFO - Replication started...
+master-1      | 2025-10-25 21:30:15,304 - __main__ - INFO - Starting replication with write_concern=1
+master-1      | 2025-10-25 21:30:15,306 - __main__ - INFO - Replicating message to secondary 1: http://follower-1:8051
+master-1      | 2025-10-25 21:30:15,309 - __main__ - INFO - Replicating message to secondary 2: http://follower-2:8051
+master-1      | 2025-10-25 21:30:15,310 - __main__ - INFO - Waiting for 0 successful replications...
+master-1      | 2025-10-25 21:30:15,310 - __main__ - INFO - Replication took 0.01 seconds
+master-1      | 2025-10-25 21:30:15,310 - __main__ - INFO - Write concern satisfied: 1/1 (including master)
+master-1      | 2025-10-25 21:30:15,310 - __main__ - INFO - Replication finished...
+master-1      | INFO:     192.168.65.1:17300 - "POST /add HTTP/1.1" 200 OK
+follower-2-1  | 2025-10-25 21:30:15,312 - __main__ - INFO - Replicating message: text='msg4' sequence_id=4
+follower-2-1  | 2025-10-25 21:30:15,312 - __main__ - INFO - Processing replication with 10.00s delay...
+follower-1-1  | 2025-10-25 21:30:15,312 - __main__ - INFO - Replicating message: text='msg4' sequence_id=4
+follower-1-1  | 2025-10-25 21:30:15,312 - __main__ - INFO - Processing replication with 0.00s delay...
+follower-1-1  | 2025-10-25 21:30:15,312 - __main__ - INFO - Message replicated successfully: text='msg4' sequence_id=4
+follower-1-1  | INFO:     172.18.0.4:35380 - "POST /replicate HTTP/1.1" 200 OK
+master-1      | 2025-10-25 21:30:15,313 - __main__ - INFO - Message successfully replicated to secondary 1.
+master-1      | 2025-10-25 21:30:17,493 - __main__ - INFO - Retrieved 4 messages from master: ['msg1', 'msg2', 'msg3', 'msg4']
+master-1      | INFO:     192.168.65.1:17300 - "GET /messages HTTP/1.1" 200 OK
+follower-1-1  | 2025-10-25 21:30:19,634 - __main__ - INFO - Retrieved 4 replicated messages: ['msg1', 'msg2', 'msg3', 'msg4']
+follower-1-1  | INFO:     192.168.65.1:37659 - "GET /messages HTTP/1.1" 200 OK
+follower-2-1  | 2025-10-25 21:30:22,280 - __main__ - INFO - Retrieved 3 replicated messages: ['msg1', 'msg2', 'msg3']
+follower-2-1  | INFO:     192.168.65.1:19179 - "GET /messages HTTP/1.1" 200 OK
+follower-2-1  | 2025-10-25 21:30:25,318 - __main__ - INFO - Message replicated successfully: text='msg4' sequence_id=4
+follower-2-1  | INFO:     172.18.0.4:47514 - "POST /replicate HTTP/1.1" 200 OK
+master-1      | 2025-10-25 21:30:25,322 - __main__ - INFO - Message successfully replicated to secondary 2.
+follower-2-1  | 2025-10-25 21:30:39,074 - __main__ - INFO - Retrieved 4 replicated messages: ['msg1', 'msg2', 'msg3', 'msg4']
+follower-2-1  | INFO:     192.168.65.1:40300 - "GET /messages HTTP/1.1" 200 OK
