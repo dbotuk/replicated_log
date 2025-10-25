@@ -44,9 +44,8 @@ Adds a new message and replicates it to all follower servers.
 **Request:**
 ```json
 {
-  "data": {
-    "text": "message content"
-  }
+  "data": "message content",
+  "write_concern": 1
 }
 ```
 
@@ -87,7 +86,7 @@ Retrieves all replicated messages from the follower server.
 
 ### 1. Adding a message
 ```bash
-curl -X POST -H "Content-Type: application/json" http://localhost:6061/add -d '{"data": {"text": "msg1"}}'
+curl -X POST -H "Content-Type: application/json" http://localhost:6061/add -d '{"data": "msg1", "write_concern": 1}'
 ```
 
 ### 2. Checking messages on master server
@@ -109,9 +108,9 @@ curl http://localhost:6063/messages
 
 1. **Add several messages:**
 ```bash
-curl -X POST -H "Content-Type: application/json" http://localhost:6061/add -d '{"data": {"text": "msg1"}}'
-curl -X POST -H "Content-Type: application/json" http://localhost:6061/add -d '{"data": {"text": "msg2"}}'
-curl -X POST -H "Content-Type: application/json" http://localhost:6061/add -d '{"data": {"text": "msg3"}}'
+curl -X POST -H "Content-Type: application/json" http://localhost:6061/add -d '{"data": "msg1", "write_concern": 1}'
+curl -X POST -H "Content-Type: application/json" http://localhost:6061/add -d '{"data": "msg2", "write_concern": 1}'
+curl -X POST -H "Content-Type: application/json" http://localhost:6061/add -d '{"data": "msg3", "write_concern": 1}'
 ```
 
 2. **Check replication on all servers:**
