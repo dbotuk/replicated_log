@@ -8,7 +8,7 @@ RUN pip install -r requirements.txt
 COPY api/base.py ./base.py
 COPY api/follower/ ./
 
-EXPOSE 8051
+EXPOSE ${PORT}
 
-ENTRYPOINT ["python", "follower.py", "0.0.0.0", "8051"]
+ENTRYPOINT ["python", "follower.py"]
 CMD ["follower", "5.0"]

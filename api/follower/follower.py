@@ -1,11 +1,12 @@
 import asyncio
 import logging
-import random
+import os
+import socket
 import sys
 import time
-from typing import Dict, List
+from typing import List
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 import requests
 import uvicorn
 
@@ -36,50 +37,62 @@ class FollowerServer:
         logger.info(f"Secondary server {server_id} initialized on {host}:{port}")
 
     def setup_routes(self):
-        """Setup HTTP routes for the secondary server."""
 
         @self.app.post("/replicate", response_model=BaseResponse[None])
         async def replicate_message(request: BaseRequest[Message]):
-            message = request.data
-            logger.info(f"Replicating message: {message}")
+            try:
+                message = request.data
+                logger.info(f"Replicating message: {message}")
 
-            logger.info(f"Processing replication with {self.delay:.2f}s delay...")
-            await asyncio.sleep(self.delay)
+                logger.info(f"Processing replication with {self.delay:.2f}s delay...")
+                await asyncio.sleep(self.delay)
 
-            message_added = self.messages.append(message)
+                message_added = self.messages.append(message)
 
-            if not message_added:
-                logger.info(f"Message {message} was not added (duplicate)")
-            else:
-                logger.info(f"Message replicated successfully: {message}")
+                if not message_added:
+                    logger.info(f"Message {message} was not added (duplicate)")
+                else:
+                    logger.info(f"Message replicated successfully: {message}")
 
-            return BaseResponse[None](
-                status_code=200,
-                message="Message replicated successfully"
-            )
+                return BaseResponse[None](
+                    status_code=200,
+                    message="Message replicated successfully"
+                )
+            except ValueError as e:
+                logger.error(f"Invalid message data: {e}")
+                raise HTTPException(status_code=400, detail=f"Invalid message data: {str(e)}")
+            except asyncio.CancelledError:
+                logger.warning("Replication cancelled")
+                raise HTTPException(status_code=408, detail="Replication request cancelled")
+            except Exception as e:
+                logger.error(f"Unexpected error during replication: {e}")
+                raise HTTPException(status_code=500, detail="Internal server error during replication")
             
         @self.app.get("/messages", response_model=BaseResponse[list[str]])
         async def list_messages():
-            messages = list(map(lambda x: x.text, self.messages.get_messages()))
-            logger.info(f"Retrieved {len(messages)} replicated messages: {messages}")
-            
-            return BaseResponse[list[str]](
-                status_code=200,
-                message="Messages fetched successfully", 
-                data=messages
-            )
+            try:
+                messages = list(map(lambda x: x.text, self.messages.get_messages()))
+                logger.info(f"Retrieved {len(messages)} replicated messages: {messages}")
+                
+                return BaseResponse[list[str]](
+                    status_code=200,
+                    message="Messages fetched successfully", 
+                    data=messages
+                )
+            except Exception as e:
+                logger.error(f"Error retrieving replicated messages: {e}")
+                raise HTTPException(status_code=500, detail="Failed to retrieve replicated messages")
     
     def run(self, debug=False):
-        """Start the secondary server."""
         uvicorn.run(self.app, host=self.host, port=self.port)
 
 
 if __name__ == "__main__":
-    host = sys.argv[1] if len(sys.argv) > 1 else "0.0.0.0"
-    port = int(sys.argv[2]) if len(sys.argv) > 2 else 8052
-    server_id = sys.argv[3] if len(sys.argv) > 3 else "follower"
-    delay = sys.argv[4] if len(sys.argv) > 4 else "5.0"
-    delay = float(delay)
+    host = socket.gethostname()
+    port = int(os.getenv('PORT', 8051))    
+
+    server_id = sys.argv[1] if len(sys.argv) > 1 else "follower"
+    delay = float(sys.argv[2] if len(sys.argv) > 2 else "5.0")
 
     follower = FollowerServer(
         delay,

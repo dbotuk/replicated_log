@@ -8,7 +8,6 @@ RUN pip install -r requirements.txt
 COPY api/base.py ./base.py
 COPY api/master/ ./
 
-EXPOSE 8051
+EXPOSE ${PORT}
 
-ENTRYPOINT ["python", "master.py", "0.0.0.0", "8051"]
-CMD ["http://0.0.0.0:8052"]
+ENTRYPOINT ["python", "master.py"]
