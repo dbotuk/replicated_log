@@ -108,36 +108,39 @@ class MasterServer:
         loop = asyncio.get_running_loop()
         executor = ThreadPoolExecutor(max_workers=max(1, len(self.secondaries)))
 
-        tasks = [
-                    loop.run_in_executor(executor, self._replicate_to_follower, secondary_url, message, index)
-                    for index, secondary_url 
-                    in enumerate(self.secondaries)
-                ]
-
         try:
-            for index, completed in enumerate(asyncio.as_completed(tasks, timeout=60)):
-                if replicated >= write_concern:
-                    time_end = time.time()
-                    logger.info(f"Write concern satisfied: {replicated}/{write_concern}")
-                    logger.info(f"Replication took {round(time_end - time_start, 2)} seconds")
-                    return True
-                try:
-                    ok = await completed
+            tasks = [
+                        loop.run_in_executor(executor, self._replicate_to_follower, secondary_url, message, index)
+                        for index, secondary_url 
+                        in enumerate(self.secondaries)
+                    ]
 
-                    if ok:
-                        replicated += 1
-                        logger.info(f"Successful replications: {replicated}/{write_concern}")  
-                    else:
-                        logger.warning(f"Replication failed for secondary {index + 1} ({self.secondaries[index]}).")
+            try:
+                for index, completed in enumerate(asyncio.as_completed(tasks, timeout=60)):
+                    if replicated >= write_concern:
+                        time_end = time.time()
+                        logger.info(f"Write concern satisfied: {replicated}/{write_concern}")
+                        logger.info(f"Replication took {round(time_end - time_start, 2)} seconds")
+                        return True
+                    try:
+                        ok = await completed
 
-                except Exception as exc:
-                    logger.error(f"Replication task raised for secondary {index + 1} ({self.secondaries[index]}): {exc}")
-        except asyncio.TimeoutError:
-            logger.error("Replication timed out after 60 seconds")
+                        if ok:
+                            replicated += 1
+                            logger.info(f"Successful replications: {replicated}/{write_concern}")  
+                        else:
+                            logger.warning(f"Replication failed for secondary {index + 1} ({self.secondaries[index]}).")
+
+                    except Exception as exc:
+                        logger.error(f"Replication task raised for secondary {index + 1} ({self.secondaries[index]}): {exc}")
+            except asyncio.TimeoutError:
+                logger.error("Replication timed out after 60 seconds")
+                return False
+
+            logger.warning(f"Write concern not satisfied: {replicated}/{write_concern}")
             return False
-
-        logger.warning(f"Write concern not satisfied: {replicated}/{write_concern}")
-        return False
+        finally:
+            executor.shutdown(wait=True)
 
     def _replicate_to_follower(self, secondary_url: str, message: Message, index: int) -> bool:
         try:
