@@ -1,4 +1,6 @@
+import atexit
 import logging
+import random
 import threading
 import time
 import asyncio
@@ -23,10 +25,11 @@ logger = logging.getLogger(__name__)
 
 
 class MasterServer:
-    def __init__(self, host='0.0.0.0', port=5000, secondaries=None):
+    def __init__(self, host='0.0.0.0', port=5000, secondaries=None, replication_timeout=20):
         self.host = host
         self.port = port
         self.secondaries = secondaries or []
+        self.replication_timeout = replication_timeout
         self.messages = MessageLog()
         self.message_counter = 0
         self.app = FastAPI(
@@ -34,6 +37,8 @@ class MasterServer:
             description="A Master FastAPI server for storing messages",
             version="1.0.0"
         )
+        self.executor = ThreadPoolExecutor(max_workers=max(1, len(self.secondaries)))
+        atexit.register(self.executor.shutdown, wait=True)
         self.setup_routes()
         
         logger.info(f"Master server initialized on {host}:{port}")
@@ -106,50 +111,53 @@ class MasterServer:
         replicated = 1
 
         loop = asyncio.get_running_loop()
-        executor = ThreadPoolExecutor(max_workers=max(1, len(self.secondaries)))
+        
 
+        tasks = [
+                    loop.run_in_executor(self.executor, self._replicate_to_follower, secondary_url, message, index)
+                    for index, secondary_url 
+                    in enumerate(self.secondaries)
+                ]
+            
         try:
-            tasks = [
-                        loop.run_in_executor(executor, self._replicate_to_follower, secondary_url, message, index)
-                        for index, secondary_url 
-                        in enumerate(self.secondaries)
-                    ]
+            for index, completed in enumerate(asyncio.as_completed(tasks, timeout=self.replication_timeout * 10)):
+                if replicated >= write_concern:
+                    time_end = time.time()
+                    logger.info(f"Write concern satisfied: {replicated}/{write_concern}")
+                    logger.info(f"Replication took {round(time_end - time_start, 2)} seconds")
+                    return True
+                try:
+                    ok = await completed
+                    if ok:
+                        replicated += 1
+                        logger.info(f"Successful replications: {replicated}/{write_concern}")  
+                    else:
+                        logger.warning(f"Replication failed for secondary {index + 1} ({self.secondaries[index]}).")
 
-            try:
-                for index, completed in enumerate(asyncio.as_completed(tasks, timeout=60)):
-                    if replicated >= write_concern:
-                        time_end = time.time()
-                        logger.info(f"Write concern satisfied: {replicated}/{write_concern}")
-                        logger.info(f"Replication took {round(time_end - time_start, 2)} seconds")
-                        return True
-                    try:
-                        ok = await completed
-
-                        if ok:
-                            replicated += 1
-                            logger.info(f"Successful replications: {replicated}/{write_concern}")  
-                        else:
-                            logger.warning(f"Replication failed for secondary {index + 1} ({self.secondaries[index]}).")
-
-                    except Exception as exc:
-                        logger.error(f"Replication task raised for secondary {index + 1} ({self.secondaries[index]}): {exc}")
-            except asyncio.TimeoutError:
-                logger.error("Replication timed out after 60 seconds")
-                return False
-
-            logger.warning(f"Write concern not satisfied: {replicated}/{write_concern}")
+                except Exception as exc:
+                    logger.error(f"Replication task raised for secondary {index + 1} ({self.secondaries[index]}): {exc}")
+        except asyncio.TimeoutError:
+            logger.error("Replication timed out after 60 seconds")
             return False
-        finally:
-            executor.shutdown(wait=True)
 
+        logger.warning(f"Write concern not satisfied: {replicated}/{write_concern}")
+        return False
+    
     def _replicate_to_follower(self, secondary_url: str, message: Message, index: int) -> bool:
+        result = self._send_message(secondary_url, message, index)
+
+        if not result:
+            return self._retry_replication(secondary_url, message, index)
+        return result
+
+    def _send_message(self, secondary_url: str, message: Message, index: int) -> bool:
         try:
             logger.info(f"Replicating message to secondary {index + 1}: {secondary_url}")
 
             response = requests.post(
                 f"{secondary_url}/replicate",
                 json=BaseRequest(data=message).model_dump(),
-                timeout=60
+                timeout=self.replication_timeout
             )
 
             if response.status_code == 200:
@@ -182,6 +190,26 @@ class MasterServer:
             )
             return False
     
+    def _calculate_retry_delay(self, attempt: int, base: float = 5.0, cap: float = 60.0) -> float:
+        exp = min(cap, base * (2 ** (attempt - 1)))
+        return random.uniform(0, exp)
+
+    def _retry_replication(self, secondary_url: str, message: Message, index: int) -> bool:
+        attempt = 0
+        while True:
+            attempt += 1
+            logger.info(f"Retry replication to secondary {index + 1}: {secondary_url} (attempt {attempt})")
+            delay = self._calculate_retry_delay(attempt)
+            logger.info(f"Waiting {delay:.2f} seconds before retrying...")
+            time.sleep(delay)
+            
+            success = self._send_message(secondary_url, message, index)
+            if success:
+                logger.info(f"Successful retry replication to secondary {index + 1}: {secondary_url} (attempt {attempt})")
+                return True
+            else:
+                logger.info(f"Failed retry replication to secondary {index + 1}: {secondary_url} (attempt {attempt})")
+
     def run(self, debug=False):
         uvicorn.run(self.app, host=self.host, port=self.port)
 
