@@ -7,14 +7,15 @@ import asyncio
 import socket
 import os
 from concurrent.futures import ThreadPoolExecutor
-from typing import List, Set 
+from typing import Dict, List
+
 
 from fastapi import FastAPI, HTTPException
 import requests
 from requests.exceptions import RequestException, Timeout, ConnectionError
 import uvicorn
 
-from base import BaseRequest, BaseResponse, Message, MessageLog, MasterRequest
+from base import BaseRequest, BaseResponse, Message, MessageLog, MasterRequest, HealthStatus, Node, HealthChecker
 
 
 logging.basicConfig(
@@ -23,12 +24,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-
 class MasterServer:
-    def __init__(self, host='0.0.0.0', port=5000, secondaries=None, replication_timeout=20):
+    STATUS_MULTIPLIER = {
+        HealthStatus.HEALTHY: 1.0,
+        HealthStatus.SUSPECTED: 3.0,
+        HealthStatus.UNHEALTHY: 8.0,
+    }
+
+    def __init__(self, host='0.0.0.0', port=5000, secondaries=None, replication_timeout=20, heartbeat_interval=5.0):
         self.host = host
         self.port = port
-        self.secondaries = secondaries or []
+        self.secondaries = [Node(id, url) for id, url in enumerate(secondaries)]
         self.replication_timeout = replication_timeout
         self.messages = MessageLog()
         self.message_counter = 0
@@ -37,8 +43,13 @@ class MasterServer:
             description="A Master FastAPI server for storing messages",
             version="1.0.0"
         )
-        self.executor = ThreadPoolExecutor(max_workers=max(1, len(self.secondaries)))
+        self.executor = ThreadPoolExecutor()
         atexit.register(self.executor.shutdown, wait=True)
+        
+        self.health_checker = HealthChecker(self.secondaries, logger, heartbeat_interval)
+        atexit.register(self.health_checker.stop)
+        self.health_checker.start()
+        
         self.setup_routes()
         
         logger.info(f"Master server initialized on {host}:{port}")
@@ -48,6 +59,8 @@ class MasterServer:
 
         @self.app.post("/add", response_model=BaseResponse[None])
         async def add_message(request: MasterRequest[str]):
+            if not self.health_checker.quorum_status:
+                raise HTTPException(status_code=500, detail="Quorum not satisfied")
             try:
                 with threading.Lock():
                     self.message_counter += 1
@@ -59,17 +72,17 @@ class MasterServer:
 
                 write_concern = request.write_concern
 
-                logger.info(f"Received message: {message} with write_concern={write_concern}")
+                logger.info(f"Received message {message.sequence_id} '{message.text}' with write_concern={write_concern}")
                 
                 message_added = self.messages.append(message)
 
                 if not message_added:
-                    logger.info(f"Message {message} was not added.")
+                    logger.info(f"Message {message.sequence_id} '{message.text}' was not added.")
                 else:
-                    logger.info(f"Message added successfully: {message}")
+                    logger.info(f"Message {message.sequence_id} '{message.text}' added successfully.")
 
                 logger.info(f"Replication started...")
-                replication_success = await self.replicate(message, write_concern)
+                replication_success = await self._replicate(message, write_concern)
                 logger.info(f"Replication finished...")
 
                 if replication_success:
@@ -103,24 +116,37 @@ class MasterServer:
             except Exception as e:
                 logger.error(f"Error retrieving messages: {e}")
                 raise HTTPException(status_code=500, detail="Failed to retrieve messages")
+        
+        @self.app.get("/health", response_model=BaseResponse[List[Dict]])
+        async def get_health():
+            try:
+                health_status = [secondary.get_status() for secondary in self.secondaries]
+                logger.info(f"Health check requested: {health_status}")
+                
+                return BaseResponse[List[Dict]](
+                    status_code=200,
+                    message="Health status retrieved successfully",
+                    data=health_status
+                )
+            except Exception as e:
+                logger.error(f"Error retrieving health status: {e}")
+                raise HTTPException(status_code=500, detail="Failed to retrieve health status")
     
-    async def replicate(self, message: Message, write_concern: int) -> bool:
+    async def _replicate(self, message: Message, write_concern: int) -> bool:
         logger.info(f"Starting replication with write_concern={write_concern}")
 
         time_start = time.time()
         replicated = 1
 
         loop = asyncio.get_running_loop()
-        
 
         tasks = [
-                    loop.run_in_executor(self.executor, self._replicate_to_follower, secondary_url, message, index)
-                    for index, secondary_url 
-                    in enumerate(self.secondaries)
-                ]
+            loop.run_in_executor(self.executor, self._replicate_to_follower, secondary, message)
+            for secondary in self.secondaries
+        ]
             
         try:
-            for index, completed in enumerate(asyncio.as_completed(tasks, timeout=self.replication_timeout * 10)):
+            for completed in asyncio.as_completed(tasks, timeout=self.replication_timeout * 10):
                 if replicated >= write_concern:
                     time_end = time.time()
                     logger.info(f"Write concern satisfied: {replicated}/{write_concern}")
@@ -130,85 +156,82 @@ class MasterServer:
                     ok = await completed
                     if ok:
                         replicated += 1
-                        logger.info(f"Successful replications: {replicated}/{write_concern}")  
+                        logger.info(f"Successful replications: {replicated}/{write_concern}")
                     else:
-                        logger.warning(f"Replication failed for secondary {index + 1} ({self.secondaries[index]}).")
+                        logger.warning(f"Replication failed.")
 
                 except Exception as exc:
-                    logger.error(f"Replication task raised for secondary {index + 1} ({self.secondaries[index]}): {exc}")
+                    logger.error(f"Replication task raised an exception: {exc}")
         except asyncio.TimeoutError:
             logger.error("Replication timed out after 60 seconds")
             return False
-
         logger.warning(f"Write concern not satisfied: {replicated}/{write_concern}")
         return False
     
-    def _replicate_to_follower(self, secondary_url: str, message: Message, index: int) -> bool:
-        result = self._send_message(secondary_url, message, index)
+    def _replicate_to_follower(self, secondary: Node, message: Message) -> bool:
+        attempt = 0
+        
+        while True:
+            if attempt > 0:
+                self._delay(attempt, secondary.status)
+                logger.info(f"Retry replication of message {message.sequence_id} '{message.text}' to secondary {secondary.id + 1}: {secondary.url} (attempt {attempt})")
+                
+            if secondary.status == HealthStatus.UNHEALTHY:
+                logger.warning(f"Skipping replication of message {message.sequence_id} '{message.text}'  to secondary {secondary.id + 1} ({secondary.url}): Status is {secondary.status.value}")
+                attempt += 1
+                continue
+            
+            success = self._send_message(secondary, message)
+            if success:
+                return True
+            else:
+                attempt += 1
 
-        if not result:
-            return self._retry_replication(secondary_url, message, index)
-        return result
-
-    def _send_message(self, secondary_url: str, message: Message, index: int) -> bool:
+    def _send_message(self, secondary: Node, message: Message) -> bool:
         try:
-            logger.info(f"Replicating message to secondary {index + 1}: {secondary_url}")
+            logger.info(f"Replicating message {message.sequence_id} '{message.text}' to secondary {secondary.id + 1}: {secondary.url}")
 
             response = requests.post(
-                f"{secondary_url}/replicate",
+                f"{secondary.url}/replicate",
                 json=BaseRequest(data=message).model_dump(),
                 timeout=self.replication_timeout
             )
 
             if response.status_code == 200:
-                logger.info(f"Message successfully replicated to secondary {index + 1}.")
-                return True
-
-            logger.warning(
-                f"Replication failed to secondary {index + 1}: HTTP {response.status_code}"
-            )
-            return False
-
-        except Timeout as exc:
-            logger.error(
-                f"Timeout replicating to secondary {index + 1} ({secondary_url}): {exc}"
-            )
-            return False
-        except ConnectionError as exc:
-            logger.error(
-                f"Connection error replicating to secondary {index + 1} ({secondary_url}): {exc}"
-            )
-            return False
-        except RequestException as exc:
-            logger.error(
-                f"Request error replicating to secondary {index + 1} ({secondary_url}): {exc}"
-            )
-            return False
-        except Exception as exc:
-            logger.error(
-                f"Unexpected error replicating to secondary {index + 1} ({secondary_url}): {exc}"
-            )
-            return False
-    
-    def _calculate_retry_delay(self, attempt: int, base: float = 5.0, cap: float = 60.0) -> float:
-        exp = min(cap, base * (2 ** (attempt - 1)))
-        return random.uniform(0, exp)
-
-    def _retry_replication(self, secondary_url: str, message: Message, index: int) -> bool:
-        attempt = 0
-        while True:
-            attempt += 1
-            logger.info(f"Retry replication to secondary {index + 1}: {secondary_url} (attempt {attempt})")
-            delay = self._calculate_retry_delay(attempt)
-            logger.info(f"Waiting {delay:.2f} seconds before retrying...")
-            time.sleep(delay)
-            
-            success = self._send_message(secondary_url, message, index)
-            if success:
-                logger.info(f"Successful retry replication to secondary {index + 1}: {secondary_url} (attempt {attempt})")
+                logger.info(f"Message {message.sequence_id} '{message.text}' successfully replicated to secondary {secondary.id + 1}.")
+                secondary.record_success()
                 return True
             else:
-                logger.info(f"Failed retry replication to secondary {index + 1}: {secondary_url} (attempt {attempt})")
+                logger.warning(f"Replication of message {message.sequence_id} '{message.text}' failed to secondary {secondary.id + 1}: HTTP {response.status_code}")
+                secondary.record_failure()
+                return False
+
+        except Timeout as exc:
+            logger.error(f"Timeout replicating message {message.sequence_id} '{message.text}' to secondary {secondary.id + 1} ({secondary.url}): {exc}")
+            secondary.record_failure()
+            return False
+        except ConnectionError as exc:
+            logger.error(f"Connection error replicating message {message.sequence_id} '{message.text}' to secondary {secondary.id + 1} ({secondary.url}): {exc}")
+            secondary.record_failure()
+            return False
+        except RequestException as exc:
+            logger.error(f"Request error replicating message {message.sequence_id} '{message.text}' to secondary {secondary.id + 1} ({secondary.url}): {exc}")
+            secondary.record_failure()
+            return False
+        except Exception as exc:
+            logger.error(f"Unexpected error replicating message {message.sequence_id} '{message.text}' to secondary {secondary.id + 1} ({secondary.url}): {exc}")
+            secondary.record_failure()
+            return False
+    
+    def _calculate_retry_delay(self, attempt: int, status: HealthStatus, base: float = 0.5, cap: float = 60.0) -> float:
+        exp = min(cap, base * (2 ** (attempt - 1)))
+        adjusted = exp * self.STATUS_MULTIPLIER[status]
+        return random.uniform(0, adjusted)
+    
+    def _delay(self, attempt: int, status: HealthStatus, base: float = 0.5, cap: float = 60.0) -> float:
+        delay = self._calculate_retry_delay(attempt, status)
+        logger.info(f"Waiting {delay:.2f} seconds before retrying...")
+        time.sleep(delay)
 
     def run(self, debug=False):
         uvicorn.run(self.app, host=self.host, port=self.port)

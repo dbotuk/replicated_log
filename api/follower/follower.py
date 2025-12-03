@@ -38,11 +38,18 @@ class FollowerServer:
 
     def setup_routes(self):
 
+        @self.app.get("/health", response_model=BaseResponse[None])
+        async def get_health():
+            return BaseResponse[None](
+                status_code=200,
+                message="Health check successful"
+            )
+
         @self.app.post("/replicate", response_model=BaseResponse[None])
         async def replicate_message(request: BaseRequest[Message]):
             try:
                 message = request.data
-                logger.info(f"Replicating message: {message}")
+                logger.info(f"Replicating message {message.sequence_id} '{message.text}'")
 
                 logger.info(f"Processing replication with {self.delay:.2f}s delay...")
                 await asyncio.sleep(self.delay)
@@ -50,9 +57,9 @@ class FollowerServer:
                 message_added = self.messages.append(message)
 
                 if not message_added:
-                    logger.info(f"Message {message} was not added (duplicate)")
+                    logger.info(f"Message {message.sequence_id} '{message.text}' was not added (duplicate)")
                 else:
-                    logger.info(f"Message replicated successfully: {message}")
+                    logger.info(f"Message {message.sequence_id} '{message.text}' replicated successfully.")
 
                 return BaseResponse[None](
                     status_code=200,
